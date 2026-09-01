@@ -1,0 +1,63 @@
+﻿/** @type {import('tailwindcss').Config} */
+module.exports = {
+  content: [
+    './app/**/*.{js,ts,jsx,tsx,mdx}',
+    './src/**/*.{js,ts,jsx,tsx,mdx}',
+  ],
+  theme: {
+    extend: {
+      colors: {
+        primary: '#01261f',
+        secondary: '#2c694e',
+        tertiary: '#2e1e00',
+        'tertiary-fixed': '#ffdea9',
+        'tertiary-fixed-dim': '#ffba27',
+        'on-tertiary': '#ffffff',
+        surface: '#fcf9f8',
+        'surface-variant': '#e5e2e1',
+        'on-surface': '#1c1b1b',
+        'on-surface-variant': '#414846',
+        outline: '#717976',
+        'outline-variant': '#c1c8c4',
+        'primary-fixed': '#c5eadf',
+        'primary-fixed-dim': '#aacec3',
+        'on-primary': '#ffffff',
+        'on-primary-fixed': '#00201a',
+        'on-primary-fixed-variant': '#2b4d44',
+        'secondary-fixed': '#b1f0ce',
+        'on-secondary': '#ffffff',
+        'secondary-container': '#aeeecb',
+        'on-secondary-container': '#316e52',
+        error: '#ba1a1a',
+        'on-error': '#ffffff',
+        'error-container': '#ffdad6',
+        'on-error-container': '#93000a',
+      },
+      fontFamily: {
+        'display-lg': ['Montserrat', 'sans-serif'],
+        'display-lg-mobile': ['Montserrat', 'sans-serif'],
+        'headline-md': ['Montserrat', 'sans-serif'],
+        'body-lg': ['Inter', 'sans-serif'],
+        'body-md': ['Inter', 'sans-serif'],
+        'label-bold': ['Inter', 'sans-serif'],
+      },
+      fontSize: {
+        'display-lg': ['48px', { lineHeight: '56px', letterSpacing: '-0.02em', fontWeight: '700' }],
+        'display-lg-mobile': ['32px', { lineHeight: '40px', letterSpacing: '-0.01em', fontWeight: '700' }],
+        'headline-md': ['24px', { lineHeight: '32px', fontWeight: '600' }],
+        'body-lg': ['18px', { lineHeight: '28px', fontWeight: '400' }],
+        'body-md': ['16px', { lineHeight: '24px', fontWeight: '400' }],
+        'label-bold': ['14px', { lineHeight: '20px', letterSpacing: '0.05em', fontWeight: '600' }],
+      },
+      borderRadius: {
+        xl: '0.75rem',
+        full: '9999px',
+      },
+      spacing: {
+        'gutter': '24px',
+        'container-max': '1280px',
+      },
+    },
+  },
+  plugins: [],
+}
