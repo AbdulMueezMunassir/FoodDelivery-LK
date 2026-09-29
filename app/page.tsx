@@ -1,5 +1,6 @@
 ﻿'use client';
 
+import Image from 'next/image';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 
@@ -71,10 +72,16 @@ export default function Home() {
           </div>
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <button className="bg-tertiary-fixed-dim text-on-tertiary-fixed px-8 py-3 rounded-lg font-label-bold text-label-bold hover:brightness-110 transition-all shadow-md">
+            <button
+              onClick={() => router.push('/restaurants')}
+              className="bg-tertiary-fixed-dim text-on-tertiary-fixed px-8 py-3 rounded-lg font-label-bold text-label-bold hover:brightness-110 transition-all shadow-md"
+            >
               Order Now
             </button>
-            <button className="border-2 border-primary text-primary px-8 py-3 rounded-lg font-label-bold text-label-bold hover:bg-primary/5 transition-all">
+            <button
+              onClick={() => router.push('/restaurants')}
+              className="border-2 border-primary text-primary px-8 py-3 rounded-lg font-label-bold text-label-bold hover:bg-primary/5 transition-all"
+            >
               Explore Restaurants
             </button>
           </div>
@@ -83,23 +90,28 @@ export default function Home() {
 
       {/* Categories Section */}
       <section className="py-12 px-4 md:px-8 max-w-container-max mx-auto">
-        <h2 className="font-headline-md text-headline-md text-primary mb-6 text-center md:text-left">
+        <h2 className="font-headline-md text-headline-md text-primary mb-8 text-left">
           Explore Categories
         </h2>
-        <div className="flex overflow-x-auto gap-4 pb-2 no-scrollbar snap-x snap-mandatory">
+        <div className="flex overflow-x-auto gap-6 pb-2 no-scrollbar snap-x snap-mandatory">
           {[
-            { name: 'Rice & Curry', icon: '🍛' },
-            { name: 'Kottu', icon: '🍲' },
-            { name: 'Hoppers', icon: '🥞' },
-            { name: 'String Hoppers', icon: '🍜' },
-            { name: 'Short Eats', icon: '🍢' },
-            { name: 'Biryani', icon: '🍚' },
+            { name: 'Rice & Curry', image: 'https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&w=900&q=80' },
+            { name: 'Kottu', image: 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=900&q=80' },
+            { name: 'Hoppers', image: 'https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=900&q=80' },
+            { name: 'String Hoppers', image: 'https://images.unsplash.com/photo-1559847844-5315695dadae?auto=format&fit=crop&w=900&q=80' },
+            { name: 'Short Eats', image: 'https://images.unsplash.com/photo-1529042410759-bef122d4f8bd?auto=format&fit=crop&w=900&q=80' },
           ].map((category) => (
-            <div key={category.name} className="flex-none w-[120px] sm:w-[150px] snap-start group cursor-pointer text-center">
-              <div className="w-24 h-24 sm:w-32 sm:h-32 mx-auto rounded-full overflow-hidden mb-2 border-4 border-surface-container shadow-sm group-hover:border-secondary transition-colors bg-surface-container flex items-center justify-center text-4xl">
-                {category.icon}
+            <div key={category.name} className="flex-none w-[160px] sm:w-[200px] snap-start group cursor-pointer text-center">
+              <div className="relative w-28 h-28 sm:w-36 sm:h-36 mx-auto rounded-full overflow-hidden mb-4 border-[3px] border-white/70 shadow-[0_12px_32px_rgba(30,41,59,0.12)] bg-surface-container transition-transform duration-300 group-hover:scale-105">
+                <Image
+                  src={category.image}
+                  alt={category.name}
+                  fill
+                  sizes="(max-width: 640px) 112px, 144px"
+                  className="object-cover"
+                />
               </div>
-              <span className="font-label-bold text-label-bold text-on-surface group-hover:text-secondary">
+              <span className="block font-label-bold text-label-bold text-on-surface group-hover:text-secondary transition-colors">
                 {category.name}
               </span>
             </div>

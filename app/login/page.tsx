@@ -44,6 +44,10 @@ export default function Login() {
         <div className="text-center">
           <h2 className="font-headline-md text-headline-md text-primary">Welcome Back</h2>
           <p className="font-body-md text-body-md text-on-surface-variant mt-1">Please enter your details to sign in.</p>
+          <p className="mt-2 text-xs text-on-surface-variant">
+            Demo customer: demo@example.com / password123<br />
+            Demo admin: admin@fooddelivery.lk / admin123
+          </p>
         </div>
 
         <form className="flex flex-col gap-5" onSubmit={handleSubmit}>

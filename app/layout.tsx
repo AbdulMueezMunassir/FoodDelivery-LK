@@ -1,6 +1,7 @@
 ﻿import './globals.css';
 import Navbar from '@/app/components/layout/Navbar';
 import Footer from '@/app/components/layout/Footer';
+import AppProviders from '@/app/components/providers/AppProviders';
 
 export const metadata = {
   title: 'FoodDelivery LK - Authentic Sri Lankan Food Delivery',
@@ -19,9 +20,11 @@ export default function RootLayout({
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Montserrat:wght@600;700&display=swap" rel="stylesheet" />
       </head>
       <body>
-        <Navbar />
-        <main>{children}</main>
-        <Footer />
+        <AppProviders>
+          <Navbar />
+          <main>{children}</main>
+          <Footer />
+        </AppProviders>
       </body>
     </html>
   );

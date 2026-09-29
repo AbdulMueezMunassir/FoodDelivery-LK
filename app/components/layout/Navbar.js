@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
+import { useCart } from '@/app/components/providers/CartProvider';
 
 export default function Navbar() {
   const pathname = usePathname();
@@ -11,6 +12,7 @@ export default function Navbar() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const { count } = useCart();
 
   useEffect(() => {
     checkAuth();
@@ -54,6 +56,9 @@ export default function Navbar() {
     { href: '/about', label: 'About' },
   ];
 
+  const isAdmin = user?.role === 'admin';
+  const isOwner = user?.role === 'owner';
+
   if (loading) {
     return (
       <nav className="fixed top-0 w-full z-50 bg-white/70 backdrop-blur-md border-b border-white/20 shadow-xl">
@@ -93,6 +98,15 @@ export default function Navbar() {
         <div className="flex items-center gap-3">
           {isLoggedIn ? (
             <div className="flex items-center gap-3">
+              {isAdmin ? (
+                <Link href="/admin" className="text-secondary hover:text-primary transition-colors font-body-md text-body-md">
+                  Admin
+                </Link>
+              ) : isOwner ? (
+                <Link href="/owner" className="text-secondary hover:text-primary transition-colors font-body-md text-body-md">
+                  Owner dashboard
+                </Link>
+              ) : null}
               <Link href="/profile" className="text-primary hover:text-secondary transition-colors font-body-md text-body-md">
                 {user?.name}
               </Link>
@@ -120,12 +134,12 @@ export default function Navbar() {
             </div>
           )}
 
-          <button className="text-primary hover:text-secondary transition-colors relative">
+          <Link href="/cart" className="text-primary hover:text-secondary transition-colors relative">
             <span className="material-symbols-outlined">shopping_cart</span>
             <span className="absolute -top-1 -right-1 bg-tertiary-fixed-dim text-on-tertiary-fixed text-[10px] w-4 h-4 rounded-full flex items-center justify-center font-bold">
-              0
+              {count}
             </span>
-          </button>
+          </Link>
 
           <button
             onClick={() => setIsMenuOpen(!isMenuOpen)}
@@ -159,6 +173,11 @@ export default function Navbar() {
           })}
           {isLoggedIn ? (
             <>
+              {isAdmin ? (
+                <Link href="/admin" className="py-2 px-3 text-secondary hover:bg-surface-variant/20 rounded-lg" onClick={() => setIsMenuOpen(false)}>
+                  Admin panel
+                </Link>
+              ) : null}
               <Link href="/profile" className="py-2 px-3 text-on-surface-variant hover:bg-surface-variant/20 rounded-lg" onClick={() => setIsMenuOpen(false)}>
                 Profile
               </Link>
