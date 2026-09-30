@@ -1,24 +1,16 @@
 import { cookies } from 'next/headers';
 import { prisma, SafeUser, sanitizeUser } from '@/lib/db';
+import { SESSION_COOKIE, verifySession } from '@/lib/session';
 
 export async function getSessionUser(): Promise<SafeUser | null> {
-  const cookieStore = cookies();
-  const userCookie = cookieStore.get('user');
+  const token = cookies().get(SESSION_COOKIE)?.value;
+  const session = await verifySession(token);
 
-  if (!userCookie) {
+  if (!session) {
     return null;
   }
 
-  try {
-    const user = JSON.parse(userCookie.value) as Partial<SafeUser>;
-
-    if (!user.id || !user.email) {
-      return null;
-    }
-
-    const databaseUser = await prisma.user.findUnique({ where: { id: user.id } });
-    return databaseUser ? sanitizeUser(databaseUser) : null;
-  } catch {
-    return null;
-  }
+  // The role always comes from the database, never from the token.
+  const databaseUser = await prisma.user.findUnique({ where: { id: session.sub } });
+  return databaseUser ? sanitizeUser(databaseUser) : null;
 }

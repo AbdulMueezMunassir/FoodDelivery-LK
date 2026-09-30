@@ -1,17 +1,9 @@
 'use client';
 
-import { createContext, useContext, useEffect, useMemo, useState } from 'react';
-import { getRestaurant, Restaurant, restaurants as seedRestaurants } from '@/lib/data';
-import {
-  CartItem,
-  Order,
-  cartCount,
-  cartSubtotal,
-  loadCart,
-  loadOrders,
-  saveCart,
-  saveOrders,
-} from '@/lib/orders';
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { usePathname } from 'next/navigation';
+import type { Restaurant } from '@/lib/data';
+import { CartItem, Order, cartCount, cartSubtotal, loadCart, saveCart } from '@/lib/orders';
 
 type CartContextValue = {
   items: CartItem[];
@@ -27,58 +19,65 @@ type CartContextValue = {
   clearCart: () => void;
   placeOrder: (details: { address: string; phone: string; customerName: string }) => Promise<Order | null>;
   updateOrderStatus: (id: string, status: Order['status']) => Promise<void>;
+  refreshOrders: () => Promise<void>;
 };
 
 const CartContext = createContext<CartContextValue | null>(null);
 
 export function CartProvider({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
   const [items, setItems] = useState<CartItem[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
-  const [restaurantCatalog, setRestaurantCatalog] = useState<Restaurant[]>(seedRestaurants);
+  const [restaurantFee, setRestaurantFee] = useState(0);
   const [ready, setReady] = useState(false);
 
+  const refreshOrders = useCallback(async () => {
+    try {
+      const response = await fetch('/api/orders', { cache: 'no-store' });
+      setOrders(response.ok ? ((await response.json()) as Order[]) : []);
+    } catch {
+      // Network error: keep what is on screen. The server is the only source of truth.
+    }
+  }, []);
+
+  // Cart lives in the browser (guest cart), everything else comes from the server.
   useEffect(() => {
-    const savedCart = loadCart();
-    setItems(savedCart);
+    setItems(loadCart());
     setReady(true);
-
-    fetch('/api/restaurants')
-      .then((response) => (response.ok ? response.json() : seedRestaurants))
-      .then((data) => setRestaurantCatalog(data))
-      .catch(() => setRestaurantCatalog(seedRestaurants));
-
-    const loadOrdersFromApi = async () => {
-      try {
-        const response = await fetch('/api/orders');
-        if (response.ok) {
-          const data = (await response.json()) as Order[];
-          setOrders(data);
-          return;
-        }
-      } catch {
-        // fall through to localStorage fallback
-      }
-
-      setOrders(loadOrders());
-    };
-
-    void loadOrdersFromApi();
   }, []);
 
   useEffect(() => {
     if (ready) saveCart(items);
   }, [items, ready]);
 
+  // Reload orders on every navigation, so login/logout never leaves stale orders behind.
   useEffect(() => {
-    if (ready) saveOrders(orders);
-  }, [orders, ready]);
+    void refreshOrders();
+  }, [pathname, refreshOrders]);
 
   const restaurantId = items[0]?.restaurantId;
-  const restaurant = restaurantId
-    ? restaurantCatalog.find((entry) => entry.id === restaurantId) ?? getRestaurant(restaurantId)
-    : undefined;
-  const deliveryFee = items.length ? restaurant?.deliveryFee ?? 0 : 0;
+
+  useEffect(() => {
+    if (!restaurantId) {
+      setRestaurantFee(0);
+      return;
+    }
+
+    let active = true;
+    fetch(`/api/restaurants/${restaurantId}`)
+      .then((response) => (response.ok ? (response.json() as Promise<Restaurant>) : null))
+      .then((data) => {
+        if (active && data) setRestaurantFee(data.deliveryFee);
+      })
+      .catch(() => undefined);
+
+    return () => {
+      active = false;
+    };
+  }, [restaurantId, pathname]);
+
   const subtotal = cartSubtotal(items);
+  const deliveryFee = items.length ? restaurantFee : 0;
 
   const value = useMemo<CartContextValue>(
     () => ({
@@ -112,25 +111,24 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       },
       setQty: (id, qty) => {
         setItems((current) =>
-          qty <= 0 ? current.filter((entry) => entry.id !== id) : current.map((entry) => (entry.id === id ? { ...entry, qty } : entry))
+          qty <= 0
+            ? current.filter((entry) => entry.id !== id)
+            : current.map((entry) => (entry.id === id ? { ...entry, qty } : entry))
         );
       },
       removeItem: (id) => setItems((current) => current.filter((entry) => entry.id !== id)),
       clearCart: () => setItems([]),
       placeOrder: async ({ address, phone, customerName }) => {
-        if (!items.length || !restaurant) return null;
+        if (!items.length) return null;
 
         try {
           const response = await fetch('/api/orders', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              items,
-              restaurantId: restaurant.id,
-              restaurantName: restaurant.name,
-              subtotal,
-              deliveryFee,
-              total: subtotal + deliveryFee,
+              // Prices are never sent. The server prices the order from the menu.
+              items: items.map((item) => ({ id: item.id, qty: item.qty })),
+              restaurantId: items[0].restaurantId,
               address,
               phone,
               customerName,
@@ -144,34 +142,37 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
           }
 
           const result = (await response.json()) as { order: Order };
-          const order = result.order;
-          setOrders((current) => [order, ...current]);
+          setOrders((current) => [result.order, ...current]);
           setItems([]);
-          return order;
+          return result.order;
         } catch (error) {
           console.error('Order submission failed:', error);
           return null;
         }
       },
       updateOrderStatus: async (id, status) => {
-        const response = await fetch(`/api/orders/${id}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ status }),
-        });
+        try {
+          const response = await fetch(`/api/orders/${id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ status }),
+          });
 
-        if (response.ok) {
-          const data = (await response.json()) as { order: Order };
-          setOrders((current) => current.map((order) => (order.id === id ? data.order : order)));
-          return;
+          if (response.ok) {
+            const data = (await response.json()) as { order: Order };
+            setOrders((current) => current.map((order) => (order.id === id ? data.order : order)));
+            return;
+          }
+        } catch (error) {
+          console.error('Order status update failed:', error);
         }
 
-        setOrders((current) =>
-          current.map((order) => (order.id === id ? { ...order, status } : order))
-        );
+        // The update failed: show what the server actually has, not a guess.
+        await refreshOrders();
       },
+      refreshOrders,
     }),
-    [deliveryFee, items, orders, restaurant, subtotal]
+    [deliveryFee, items, orders, refreshOrders, subtotal]
   );
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;

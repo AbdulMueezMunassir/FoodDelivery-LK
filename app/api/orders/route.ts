@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getSessionUser } from '@/lib/auth';
 import { prisma } from '@/lib/db';
-import { ensureRestaurantCatalog } from '@/lib/restaurant-store';
 
 function serializeOrder(order: {
   id: string;
@@ -96,7 +95,6 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Missing order details' }, { status: 400 });
     }
 
-    await ensureRestaurantCatalog();
     const restaurant = await prisma.restaurant.findUnique({ where: { id: Number(restaurantId) } });
     if (!restaurant) {
       return NextResponse.json({ error: 'Restaurant not found' }, { status: 404 });

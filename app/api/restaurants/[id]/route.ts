@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getSessionUser } from '@/lib/auth';
 import { prisma } from '@/lib/db';
-import { ensureRestaurantCatalog } from '@/lib/restaurant-store';
 import { normalizeMenuItems } from '@/lib/restaurant-validation';
 
 export const dynamic = 'force-dynamic';
@@ -32,7 +31,6 @@ function serializeRestaurant(restaurant: {
 }
 
 export async function GET(_request: Request, { params }: { params: { id: string } }) {
-  await ensureRestaurantCatalog();
   const restaurant = await prisma.restaurant.findUnique({
     where: { id: Number(params.id) },
     include: { owner: { select: { email: true } } },

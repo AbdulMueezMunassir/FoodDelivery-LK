@@ -26,7 +26,6 @@ export type Order = {
 };
 
 const CART_KEY = 'fdlk-cart';
-const ORDERS_KEY = 'fdlk-orders';
 
 export function loadCart(): CartItem[] {
   if (typeof window === 'undefined') return [];
@@ -40,20 +39,6 @@ export function loadCart(): CartItem[] {
 
 export function saveCart(items: CartItem[]) {
   localStorage.setItem(CART_KEY, JSON.stringify(items));
-}
-
-export function loadOrders(): Order[] {
-  if (typeof window === 'undefined') return [];
-  try {
-    const raw = localStorage.getItem(ORDERS_KEY);
-    return raw ? (JSON.parse(raw) as Order[]) : [];
-  } catch {
-    return [];
-  }
-}
-
-export function saveOrders(orders: Order[]) {
-  localStorage.setItem(ORDERS_KEY, JSON.stringify(orders));
 }
 
 export function cartCount(items: CartItem[]) {

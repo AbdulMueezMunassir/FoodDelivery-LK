@@ -3,18 +3,19 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 model User {
-  id           String   @id @default(cuid())
+  id           String       @id @default(cuid())
   name         String
-  email        String   @unique
+  email        String       @unique
   passwordHash String
-  role         String   @default("CUSTOMER")
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  role         String       @default("CUSTOMER")
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
   orders       Order[]
   restaurants  Restaurant[]
 }
@@ -39,19 +40,22 @@ model Restaurant {
 }
 
 model Order {
-  id            String   @id @default(cuid())
-  userId        String?
-  user          User?    @relation(fields: [userId], references: [id])
-  restaurantId  Int
+  id             String   @id @default(cuid())
+  userId         String?
+  user           User?    @relation(fields: [userId], references: [id])
+  restaurantId   Int
   restaurantName String
-  subtotal      Float
-  deliveryFee   Float
-  total         Float
-  address       String
-  phone         String
-  customerName  String
-  payment       String   @default("cod")
-  status        String   @default("CONFIRMED")
-  items         String
-  createdAt     DateTime @default(now())
+  subtotal       Float
+  deliveryFee    Float
+  total          Float
+  address        String
+  phone          String
+  customerName   String
+  payment        String   @default("cod")
+  status         String   @default("CONFIRMED")
+  items          String
+  createdAt      DateTime @default(now())
+
+  @@index([userId])
+  @@index([restaurantId])
 }

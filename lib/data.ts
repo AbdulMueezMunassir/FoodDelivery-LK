@@ -19,7 +19,6 @@ export type Restaurant = {
   menu: MenuItem[];
 };
 
-const RESTAURANTS_STORAGE_KEY = 'fdlk-restaurants';
 
 export const restaurants: Restaurant[] = [
   {
@@ -109,27 +108,7 @@ export const restaurants: Restaurant[] = [
   },
 ];
 
-export function loadRestaurants(): Restaurant[] {
-  if (typeof window === 'undefined') return restaurants;
 
-  try {
-    const raw = localStorage.getItem(RESTAURANTS_STORAGE_KEY);
-    if (!raw) return restaurants;
-    const parsed = JSON.parse(raw) as Restaurant[];
-    return parsed.length ? parsed : restaurants;
-  } catch {
-    return restaurants;
-  }
-}
-
-export function saveRestaurants(restaurantList: Restaurant[]) {
-  if (typeof window === 'undefined') return;
-  localStorage.setItem(RESTAURANTS_STORAGE_KEY, JSON.stringify(restaurantList));
-}
-
-export function getRestaurant(id: number) {
-  return loadRestaurants().find((restaurant) => restaurant.id === id);
-}
 
 export function formatLkr(amount: number) {
   return `Rs. ${amount.toLocaleString('en-LK')}`;

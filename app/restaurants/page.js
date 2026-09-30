@@ -3,16 +3,32 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
-import { restaurants, formatLkr } from '@/lib/data';
+import { formatLkr } from '@/lib/data';
 
 export default function Restaurants() {
-  const [restaurantList, setRestaurantList] = useState(restaurants);
+  const [restaurantList, setRestaurantList] = useState([]);
+  const [status, setStatus] = useState('loading'); // loading | ready | error
 
   useEffect(() => {
+    let active = true;
+
     fetch('/api/restaurants')
-      .then((response) => (response.ok ? response.json() : restaurants))
-      .then((data) => setRestaurantList(data))
-      .catch(() => setRestaurantList(restaurants));
+      .then((response) => {
+        if (!response.ok) throw new Error('Request failed');
+        return response.json();
+      })
+      .then((data) => {
+        if (!active) return;
+        setRestaurantList(data);
+        setStatus('ready');
+      })
+      .catch(() => {
+        if (active) setStatus('error');
+      });
+
+    return () => {
+      active = false;
+    };
   }, []);
 
   return (
@@ -24,17 +40,37 @@ export default function Restaurants() {
         Discover authentic Sri Lankan restaurants in Colombo
       </p>
 
+      {status === 'loading' ? (
+        <div className="flex justify-center py-16">
+          <div className="w-10 h-10 border-4 border-surface-variant border-t-primary rounded-full animate-spin" />
+        </div>
+      ) : null}
+
+      {status === 'error' ? (
+        <p className="text-on-surface-variant py-8">Could not load restaurants. Please refresh and try again.</p>
+      ) : null}
+
+      {status === 'ready' && !restaurantList.length ? (
+        <p className="text-on-surface-variant py-8">No restaurants are available yet.</p>
+      ) : null}
+
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {restaurantList.map((restaurant) => (
           <Link key={restaurant.id} href={`/restaurants/${restaurant.id}`} className="glass-card rounded-xl overflow-hidden group">
             <div className="relative h-48 w-full overflow-hidden">
-              <Image
-                src={restaurant.image}
-                alt={restaurant.name}
-                fill
-                sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                className="object-cover transition-transform duration-300 group-hover:scale-105"
-              />
+              {restaurant.image ? (
+                <Image
+                  src={restaurant.image}
+                  alt={restaurant.name}
+                  fill
+                  sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                  className="object-cover transition-transform duration-300 group-hover:scale-105"
+                />
+              ) : (
+                <div className="absolute inset-0 flex items-center justify-center bg-surface-container text-6xl">
+                  {restaurant.emoji}
+                </div>
+              )}
               <div className="absolute inset-0 bg-gradient-to-t from-black/35 to-transparent" />
             </div>
             <div className="p-4">

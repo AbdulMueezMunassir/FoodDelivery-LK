@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getSessionUser } from '@/lib/auth';
 import { prisma } from '@/lib/db';
-import { ensureRestaurantCatalog } from '@/lib/restaurant-store';
 import { normalizeMenuItems } from '@/lib/restaurant-validation';
 
 export const dynamic = 'force-dynamic';
@@ -33,7 +32,7 @@ function serializeRestaurant(restaurant: {
 
 export async function GET(request: Request) {
   try {
-    await ensureRestaurantCatalog();
+    
     const url = new URL(request.url);
     const manage = url.searchParams.get('scope') === 'manage';
     const sessionUser = manage ? await getSessionUser() : null;

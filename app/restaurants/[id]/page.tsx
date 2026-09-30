@@ -2,23 +2,43 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
-import { useMemo, useState } from 'react';
-import { useEffect } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useCart } from '@/app/components/providers/CartProvider';
-import { formatLkr, Restaurant, restaurants } from '@/lib/data';
+import { formatLkr, Restaurant } from '@/lib/data';
+
+type LoadState = 'loading' | 'ready' | 'missing' | 'error';
 
 export default function RestaurantMenu({ params }: { params: { id: string } }) {
-  const [restaurant, setRestaurant] = useState<Restaurant | null>(
-    restaurants.find((item) => item.id === Number(params.id)) ?? null
-  );
+  const [restaurant, setRestaurant] = useState<Restaurant | null>(null);
+  const [loadState, setLoadState] = useState<LoadState>('loading');
   const { addItem } = useCart();
   const [notice, setNotice] = useState('');
 
   useEffect(() => {
+    let active = true;
+    setLoadState('loading');
+
     fetch(`/api/restaurants/${params.id}`)
-      .then((response) => (response.ok ? response.json() : null))
-      .then((data) => setRestaurant(data))
-      .catch(() => undefined);
+      .then(async (response) => {
+        if (response.status === 404) {
+          if (active) setLoadState('missing');
+          return;
+        }
+        if (!response.ok) throw new Error('Request failed');
+
+        const data = (await response.json()) as Restaurant;
+        if (active) {
+          setRestaurant(data);
+          setLoadState('ready');
+        }
+      })
+      .catch(() => {
+        if (active) setLoadState('error');
+      });
+
+    return () => {
+      active = false;
+    };
   }, [params.id]);
 
   const categories = useMemo(() => {
@@ -26,10 +46,20 @@ export default function RestaurantMenu({ params }: { params: { id: string } }) {
     return Array.from(new Set(restaurant.menu.map((item) => item.category)));
   }, [restaurant]);
 
-  if (!restaurant) {
+  if (loadState === 'loading') {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="w-10 h-10 border-4 border-surface-variant border-t-primary rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (loadState !== 'ready' || !restaurant) {
     return (
       <div className="pt-24 pb-12 px-4 md:px-8 max-w-container-max mx-auto text-center">
-        <h1 className="font-headline-md text-headline-md text-primary mb-3">Restaurant not found</h1>
+        <h1 className="font-headline-md text-headline-md text-primary mb-3">
+          {loadState === 'error' ? 'Could not load this restaurant' : 'Restaurant not found'}
+        </h1>
         <Link href="/restaurants" className="text-secondary font-label-bold">
           Back to restaurants
         </Link>
@@ -45,14 +75,18 @@ export default function RestaurantMenu({ params }: { params: { id: string } }) {
 
       <div className="glass-panel rounded-xl p-6 md:p-8 mt-4 mb-8">
         <div className="flex flex-col md:flex-row md:items-center gap-4">
-          <div className="relative w-24 h-24 rounded-full overflow-hidden border border-outline-variant bg-surface-container shrink-0">
-            <Image
-              src={restaurant.image}
-              alt={restaurant.name}
-              fill
-              sizes="96px"
-              className="object-cover"
-            />
+          <div className="relative w-24 h-24 rounded-full overflow-hidden border border-outline-variant bg-surface-container shrink-0 flex items-center justify-center text-4xl">
+            {restaurant.image ? (
+              <Image
+                src={restaurant.image}
+                alt={restaurant.name}
+                fill
+                sizes="96px"
+                className="object-cover"
+              />
+            ) : (
+              <span>{restaurant.emoji}</span>
+            )}
           </div>
           <div className="flex-1">
             <h1 className="font-display-lg-mobile md:font-headline-md text-display-lg-mobile md:text-headline-md text-primary">

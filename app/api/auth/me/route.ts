@@ -1,31 +1,17 @@
 ﻿import { NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
-import { prisma, sanitizeUser } from '@/lib/db';
+import { getSessionUser } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
   try {
-    const cookieStore = cookies();
-    const userCookie = cookieStore.get('user');
-
-    if (!userCookie) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const sessionUser = JSON.parse(userCookie.value) as { id?: string };
-
-    if (!sessionUser.id) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const user = await prisma.user.findUnique({ where: { id: sessionUser.id } });
+    const user = await getSessionUser();
 
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    return NextResponse.json(sanitizeUser(user));
+    return NextResponse.json(user);
   } catch (error) {
     console.error('Auth error:', error);
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
