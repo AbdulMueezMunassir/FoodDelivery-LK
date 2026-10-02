@@ -26,7 +26,7 @@
         </div>
         <div className="col-span-1 md:col-span-1 flex flex-col justify-center items-end text-right">
           <p className="font-body-md text-body-md text-primary-fixed-dim">
-            &copy; 2024 FoodDelivery LK
+            &copy; {new Date().getFullYear()} FoodDelivery LK
           </p>
         </div>
       </div>

@@ -7,19 +7,25 @@ import { useCart } from '@/app/components/providers/CartProvider';
 import { formatLkr } from '@/lib/data';
 
 type AuthState = 'checking' | 'guest' | 'user';
+type AppliedPromo = { code: string; title: string; discount: number };
 
 const AFTER_LOGIN_KEY = 'fdlk-after-login';
 const PHONE_PATTERN = /^[0-9+()\-\s]{7,20}$/;
 
 export default function CheckoutPage() {
   const router = useRouter();
-  const { items, subtotal, deliveryFee, total, restaurantName, placeOrder } = useCart();
+  const { items, deliveryFee, total, restaurantName, placeOrder } = useCart();
   const [auth, setAuth] = useState<AuthState>('checking');
   const [customerName, setCustomerName] = useState('');
   const [phone, setPhone] = useState('');
   const [address, setAddress] = useState('');
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
+
+  const [promoInput, setPromoInput] = useState('');
+  const [promo, setPromo] = useState<AppliedPromo | null>(null);
+  const [promoError, setPromoError] = useState('');
+  const [promoBusy, setPromoBusy] = useState(false);
 
   useEffect(() => {
     fetch('/api/auth/me')
@@ -56,6 +62,45 @@ export default function CheckoutPage() {
     );
   }
 
+  const discount = promo?.discount ?? 0;
+  const payable = Math.max(0, total - discount);
+
+  const applyPromo = async () => {
+    const code = promoInput.trim();
+    if (!code || promoBusy) return;
+
+    setPromoBusy(true);
+    setPromoError('');
+
+    try {
+      const response = await fetch('/api/promos/validate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          code,
+          restaurantId: items[0].restaurantId,
+          items: items.map((item) => ({ id: item.id, qty: item.qty })),
+        }),
+      });
+
+      const data = (await response.json().catch(() => null)) as
+        | { error?: string; code?: string; title?: string; discount?: number }
+        | null;
+
+      if (!response.ok || !data?.code) {
+        setPromo(null);
+        setPromoError(data?.error ?? 'Could not check that code.');
+      } else {
+        setPromo({ code: data.code, title: data.title ?? data.code, discount: data.discount ?? 0 });
+        setPromoInput('');
+      }
+    } catch {
+      setPromoError('Network problem. Please try again.');
+    } finally {
+      setPromoBusy(false);
+    }
+  };
+
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
     if (submitting) return;
@@ -73,10 +118,11 @@ export default function CheckoutPage() {
 
     setSubmitting(true);
 
-    const order = await placeOrder({
+    const { order, error: orderError } = await placeOrder({
       customerName: customerName.trim(),
       phone: phone.trim(),
       address: address.trim(),
+      promoCode: promo?.code,
     });
 
     if (!order) {
@@ -85,7 +131,7 @@ export default function CheckoutPage() {
       if (!me || !me.ok) {
         setAuth('guest');
       } else {
-        setError('We could not place your order. Please check your details and try again.');
+        setError(orderError ?? 'We could not place your order. Please try again.');
       }
       setSubmitting(false);
       return;
@@ -158,13 +204,53 @@ export default function CheckoutPage() {
               maxLength={300}
               className={inputClass + ' resize-none'}
             />
+
+            <div className="flex flex-col gap-2">
+              {promo ? (
+                <div className="flex items-center justify-between gap-3 rounded-lg bg-secondary-container text-on-secondary-container px-4 py-3 text-sm">
+                  <span>
+                    <span className="font-label-bold font-mono tracking-widest">{promo.code}</span> applied: you save{' '}
+                    {formatLkr(promo.discount)}
+                  </span>
+                  <button type="button" onClick={() => setPromo(null)} className="font-label-bold underline">
+                    Remove
+                  </button>
+                </div>
+              ) : (
+                <div className="flex gap-2">
+                  <input
+                    value={promoInput}
+                    onChange={(event) => setPromoInput(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter') {
+                        event.preventDefault();
+                        void applyPromo();
+                      }
+                    }}
+                    placeholder="Promo code"
+                    maxLength={40}
+                    className={inputClass + ' uppercase'}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => void applyPromo()}
+                    disabled={promoBusy || !promoInput.trim()}
+                    className="shrink-0 border border-primary text-primary px-5 rounded-lg font-label-bold disabled:opacity-50"
+                  >
+                    {promoBusy ? 'Checking…' : 'Apply'}
+                  </button>
+                </div>
+              )}
+              {promoError ? <p className="text-sm text-error">{promoError}</p> : null}
+            </div>
+
             <p className="text-sm text-on-surface-variant">Payment: Cash on delivery</p>
             <button
               type="submit"
               disabled={submitting}
               className="bg-tertiary-fixed-dim text-on-tertiary-fixed py-3 rounded-lg font-label-bold disabled:opacity-60"
             >
-              {submitting ? 'Placing order…' : `Place order · ${formatLkr(total)}`}
+              {submitting ? 'Placing order…' : `Place order · ${formatLkr(payable)}`}
             </button>
           </form>
         ) : null}
@@ -185,9 +271,15 @@ export default function CheckoutPage() {
             <span>Delivery</span>
             <span>{deliveryFee === 0 ? 'Free' : formatLkr(deliveryFee)}</span>
           </div>
+          {promo ? (
+            <div className="flex justify-between text-secondary mt-2">
+              <span>Promo {promo.code}</span>
+              <span>-{formatLkr(promo.discount)}</span>
+            </div>
+          ) : null}
           <div className="flex justify-between font-label-bold text-primary mt-3">
             <span>Total</span>
-            <span>{formatLkr(total)}</span>
+            <span>{formatLkr(payable)}</span>
           </div>
         </aside>
       </div>

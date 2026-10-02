@@ -17,6 +17,8 @@ export type Order = {
   restaurantName: string;
   subtotal: number;
   deliveryFee: number;
+  discount: number;
+  promoCode?: string | null;
   total: number;
   address: string;
   phone: string;

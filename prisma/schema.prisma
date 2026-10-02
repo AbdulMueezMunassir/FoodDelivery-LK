@@ -47,6 +47,8 @@ model Order {
   restaurantName String
   subtotal       Float
   deliveryFee    Float
+  discount       Float    @default(0)
+  promoCode      String?
   total          Float
   address        String
   phone          String
@@ -58,4 +60,26 @@ model Order {
 
   @@index([userId])
   @@index([restaurantId])
+}
+
+model Promo {
+  id             String    @id @default(cuid())
+  code           String    @unique // always stored in UPPERCASE
+  title          String
+  description    String
+  badge          String    @default("Deal") // label on the offers page, e.g. "New Users"
+  type           String // PERCENT | FIXED | FREE_DELIVERY
+  value          Float     @default(0) // percent (0-100) or LKR amount
+  maxDiscount    Float? // cap for PERCENT promos
+  minSubtotal    Float     @default(0)
+  restaurantId   Int? // limit the code to one restaurant
+  firstOrderOnly Boolean   @default(false)
+  usageLimit     Int? // total redemptions allowed (empty = unlimited)
+  usedCount      Int       @default(0)
+  startsAt       DateTime?
+  expiresAt      DateTime?
+  active         Boolean   @default(true)
+  createdAt      DateTime  @default(now())
+
+  @@index([active])
 }

@@ -5,6 +5,8 @@ type OrderRow = {
   restaurantName: string;
   subtotal: number;
   deliveryFee: number;
+  discount: number;
+  promoCode: string | null;
   total: number;
   address: string;
   phone: string;
@@ -32,6 +34,8 @@ export function serializeOrder(order: OrderRow) {
     restaurantName: order.restaurantName,
     subtotal: Number(order.subtotal),
     deliveryFee: Number(order.deliveryFee),
+    discount: Number(order.discount),
+    promoCode: order.promoCode,
     total: Number(order.total),
     address: order.address,
     phone: order.phone,

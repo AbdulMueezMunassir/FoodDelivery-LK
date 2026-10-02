@@ -1,12 +1,14 @@
 import { NextResponse } from 'next/server';
+import type { Promo } from '@prisma/client';
 import { getSessionUser } from '@/lib/auth';
 import { prisma } from '@/lib/db';
+import { priceCart } from '@/lib/pricing';
+import { checkPromo, normalizeCode } from '@/lib/promo';
 import { serializeOrder } from '@/lib/serialize-order';
 
 export const dynamic = 'force-dynamic';
 
-const MAX_LINES = 40;
-const MAX_QTY = 50;
+class PromoUnavailableError extends Error {}
 
 export async function GET() {
   const sessionUser = await getSessionUser();
@@ -43,21 +45,12 @@ export async function POST(request: Request) {
 
   try {
     const body = await request.json();
-    const items = body.items;
     const restaurantId = Number(body.restaurantId);
     const address = String(body.address ?? '').trim();
     const phone = String(body.phone ?? '').trim();
     const customerName = String(body.customerName ?? '').trim();
 
-    if (!Array.isArray(items) || !items.length) {
-      return NextResponse.json({ error: 'Cart is empty' }, { status: 400 });
-    }
-
-    if (items.length > MAX_LINES) {
-      return NextResponse.json({ error: 'Too many items in one order.' }, { status: 400 });
-    }
-
-    if (!Number.isInteger(restaurantId) || !address || !phone || !customerName) {
+    if (!address || !phone || !customerName) {
       return NextResponse.json({ error: 'Missing order details' }, { status: 400 });
     }
 
@@ -69,60 +62,78 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Please check your name, phone number and address.' }, { status: 400 });
     }
 
-    const restaurant = await prisma.restaurant.findUnique({ where: { id: restaurantId } });
-    if (!restaurant) {
-      return NextResponse.json({ error: 'Restaurant not found' }, { status: 404 });
+    const priced = await priceCart(restaurantId, body.items);
+    if (!priced.ok) {
+      return NextResponse.json({ error: priced.error }, { status: priced.status });
     }
 
-    let menu: { id: string; name: string; price: number }[];
-    try {
-      menu = JSON.parse(restaurant.menu);
-    } catch {
-      return NextResponse.json({ error: 'Restaurant menu is unavailable' }, { status: 409 });
-    }
+    const { restaurant, lines, subtotal, deliveryFee } = priced;
 
-    const pricedItems = [];
-    for (const item of items) {
-      const qty = Number(item?.qty);
-      const menuItem = menu.find((entry) => entry.id === item?.id);
+    let promo: Promo | null = null;
+    let discount = 0;
+    const promoCode = normalizeCode(body.promoCode);
 
-      if (!menuItem || !Number.isInteger(qty) || qty < 1 || qty > MAX_QTY) {
-        return NextResponse.json({ error: 'One or more cart items are no longer available.' }, { status: 400 });
-      }
-
-      pricedItems.push({
-        id: menuItem.id,
-        restaurantId: restaurant.id,
-        restaurantName: restaurant.name,
-        name: menuItem.name,
-        price: menuItem.price,
-        qty,
-      });
-    }
-
-    const subtotal = pricedItems.reduce((sum, item) => sum + item.price * item.qty, 0);
-    const deliveryFee = restaurant.deliveryFee;
-    const total = subtotal + deliveryFee;
-
-    const order = await prisma.order.create({
-      data: {
+    if (promoCode) {
+      const check = await checkPromo({
+        code: promoCode,
         userId: sessionUser.id,
         restaurantId: restaurant.id,
-        restaurantName: restaurant.name,
         subtotal,
         deliveryFee,
-        total,
-        address,
-        phone,
-        customerName,
-        payment: 'cod',
-        status: 'CONFIRMED',
-        items: JSON.stringify(pricedItems),
-      },
+      });
+
+      if (!check.ok) {
+        return NextResponse.json({ error: check.error }, { status: 400 });
+      }
+
+      promo = check.promo;
+      discount = check.discount;
+    }
+
+    const total = Math.max(0, subtotal + deliveryFee - discount);
+    const appliedPromo = promo;
+
+    const order = await prisma.$transaction(async (tx) => {
+      if (appliedPromo) {
+        // Claim one use. Fails if the limit was reached since we checked.
+        const claimed = await tx.promo.updateMany({
+          where:
+            appliedPromo.usageLimit === null
+              ? { id: appliedPromo.id, active: true }
+              : { id: appliedPromo.id, active: true, usedCount: { lt: appliedPromo.usageLimit } },
+          data: { usedCount: { increment: 1 } },
+        });
+
+        if (claimed.count === 0) {
+          throw new PromoUnavailableError('This promo code is no longer available.');
+        }
+      }
+
+      return tx.order.create({
+        data: {
+          userId: sessionUser.id,
+          restaurantId: restaurant.id,
+          restaurantName: restaurant.name,
+          subtotal,
+          deliveryFee,
+          discount,
+          promoCode: appliedPromo?.code ?? null,
+          total,
+          address,
+          phone,
+          customerName,
+          payment: 'cod',
+          status: 'CONFIRMED',
+          items: JSON.stringify(lines),
+        },
+      });
     });
 
     return NextResponse.json({ success: true, order: serializeOrder(order) }, { status: 201 });
   } catch (error) {
+    if (error instanceof PromoUnavailableError) {
+      return NextResponse.json({ error: error.message }, { status: 409 });
+    }
     console.error('Order creation error:', error);
     return NextResponse.json({ error: 'Unable to create order' }, { status: 500 });
   }

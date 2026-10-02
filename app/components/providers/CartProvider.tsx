@@ -20,7 +20,12 @@ type CartContextValue = {
   setQty: (id: string, qty: number) => void;
   removeItem: (id: string) => void;
   clearCart: () => void;
-  placeOrder: (details: { address: string; phone: string; customerName: string }) => Promise<Order | null>;
+    placeOrder: (details: {
+    address: string;
+    phone: string;
+    customerName: string;
+    promoCode?: string;
+  }) => Promise<{ order: Order | null; error: string | null }>;
   /** Resolves to null on success, or the error message to show the user. */
   updateOrderStatus: (id: string, status: Order['status']) => Promise<string | null>;
   refreshOrders: () => Promise<void>;
@@ -132,8 +137,8 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       },
       removeItem: (id) => setItems((current) => current.filter((entry) => entry.id !== id)),
       clearCart: () => setItems([]),
-      placeOrder: async ({ address, phone, customerName }) => {
-        if (!items.length) return null;
+            placeOrder: async ({ address, phone, customerName, promoCode }) => {
+        if (!items.length) return { order: null, error: 'Your cart is empty.' };
 
         try {
           const response = await fetch('/api/orders', {
@@ -145,22 +150,23 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
               address,
               phone,
               customerName,
+              promoCode: promoCode || undefined,
             }),
           });
 
-          if (!response.ok) {
-            const errorData = (await response.json().catch(() => null)) as { error?: string } | null;
-            console.error(errorData?.error ?? 'Unable to place order');
-            return null;
+          const payload = (await response.json().catch(() => null)) as { order?: Order; error?: string } | null;
+          const placed = payload?.order;
+
+          if (!response.ok || !placed) {
+            return { order: null, error: payload?.error ?? 'Unable to place the order.' };
           }
 
-          const result = (await response.json()) as { order: Order };
-          setOrders((current) => [result.order, ...current]);
+          setOrders((current) => [placed, ...current]);
           setItems([]);
-          return result.order;
+          return { order: placed, error: null };
         } catch (error) {
           console.error('Order submission failed:', error);
-          return null;
+          return { order: null, error: 'Network problem. Please try again.' };
         }
       },
       updateOrderStatus: async (id, status) => {

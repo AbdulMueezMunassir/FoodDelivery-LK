@@ -1,6 +1,6 @@
 ﻿'use client';
 
-import Image from 'next/image';
+import SafeImage from '@/app/components/SafeImage';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 
@@ -9,6 +9,13 @@ export default function Home() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+
+    const [search, setSearch] = useState('');
+
+  const goSearch = (term: string) => {
+    const trimmed = term.trim();
+    router.push(trimmed ? `/restaurants?q=${encodeURIComponent(trimmed)}` : '/restaurants');
+  };
 
   useEffect(() => {
     checkAuth();
@@ -65,15 +72,24 @@ export default function Home() {
               <span className="material-symbols-outlined text-outline mr-2">location_on</span>
               <input className="w-full bg-transparent border-none focus:ring-0 text-on-surface placeholder:text-outline" placeholder="Enter delivery address..." type="text" />
             </div>
-            <div className="flex items-center flex-1 bg-surface px-3 py-2 rounded border-b-2 border-secondary focus-within:border-primary transition-colors">
+                        <div className="flex items-center flex-1 bg-surface px-3 py-2 rounded border-b-2 border-secondary focus-within:border-primary transition-colors">
               <span className="material-symbols-outlined text-outline mr-2">search</span>
-              <input className="w-full bg-transparent border-none focus:ring-0 text-on-surface placeholder:text-outline" placeholder="Search for food, restaurants..." type="text" />
+              <input
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') goSearch(search);
+                }}
+                className="w-full bg-transparent border-none focus:ring-0 text-on-surface placeholder:text-outline"
+                placeholder="Search for food, restaurants..."
+                type="text"
+              />
             </div>
           </div>
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <button
-              onClick={() => router.push('/restaurants')}
+              onClick={() => goSearch(search)}
               className="bg-tertiary-fixed-dim text-on-tertiary-fixed px-8 py-3 rounded-lg font-label-bold text-label-bold hover:brightness-110 transition-all shadow-md"
             >
               Order Now
@@ -88,36 +104,45 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Categories Section */}
+            {/* Categories Section */}
       <section className="py-12 px-4 md:px-8 max-w-container-max mx-auto">
         <h2 className="font-headline-md text-headline-md text-primary mb-8 text-left">
           Explore Categories
         </h2>
         <div className="flex overflow-x-auto gap-6 pb-2 no-scrollbar snap-x snap-mandatory">
           {[
-            { name: 'Rice & Curry', image: 'https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&w=900&q=80' },
-            { name: 'Kottu', image: 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=900&q=80' },
-            { name: 'Hoppers', image: 'https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=900&q=80' },
-            { name: 'String Hoppers', image: 'https://images.unsplash.com/photo-1559847844-5315695dadae?auto=format&fit=crop&w=900&q=80' },
-            { name: 'Short Eats', image: 'https://images.unsplash.com/photo-1529042410759-bef122d4f8bd?auto=format&fit=crop&w=900&q=80' },
+            { name: 'Rice & Curry', emoji: '🍛', image: 'https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&w=900&q=80' },
+            { name: 'Kottu', emoji: '🥘', image: 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=900&q=80' },
+            { name: 'Hoppers', emoji: '🥞', image: 'https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=900&q=80' },
+            { name: 'String Hoppers', emoji: '🍜', image: 'https://images.unsplash.com/photo-1559847844-5315695dadae?auto=format&fit=crop&w=900&q=80' },
+            { name: 'Short Eats', emoji: '🥟', image: 'https://images.unsplash.com/photo-1529042410759-bef122d4f8bd?auto=format&fit=crop&w=900&q=80' },
           ].map((category) => (
-            <div key={category.name} className="flex-none w-[160px] sm:w-[200px] snap-start group cursor-pointer text-center">
+            <button
+              key={category.name}
+              type="button"
+              onClick={() => goSearch(category.name)}
+              className="flex-none w-[160px] sm:w-[200px] snap-start group cursor-pointer text-center"
+            >
               <div className="relative w-28 h-28 sm:w-36 sm:h-36 mx-auto rounded-full overflow-hidden mb-4 border-[3px] border-white/70 shadow-[0_12px_32px_rgba(30,41,59,0.12)] bg-surface-container transition-transform duration-300 group-hover:scale-105">
-                <Image
+                <SafeImage
                   src={category.image}
                   alt={category.name}
                   fill
                   sizes="(max-width: 640px) 112px, 144px"
                   className="object-cover"
+                  fallback={
+                    <div className="absolute inset-0 flex items-center justify-center text-5xl">{category.emoji}</div>
+                  }
                 />
               </div>
               <span className="block font-label-bold text-label-bold text-on-surface group-hover:text-secondary transition-colors">
                 {category.name}
               </span>
-            </div>
+            </button>
           ))}
         </div>
       </section>
+      
     </div>
   );
 }
