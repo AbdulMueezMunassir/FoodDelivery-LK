@@ -29,7 +29,17 @@ export default function Login() {
         throw new Error(data.error || 'Login failed');
       }
 
-      router.push('/');
+            let destination = '/';
+      try {
+        const saved = sessionStorage.getItem('fdlk-after-login');
+        sessionStorage.removeItem('fdlk-after-login');
+        // Only accept paths inside this site.
+        if (saved && saved.startsWith('/') && !saved.startsWith('//')) destination = saved;
+      } catch {
+        // sessionStorage unavailable: go to the home page
+      }
+
+      router.push(destination);
       router.refresh();
     } catch (err: any) {
       setError(err.message || 'Login failed. Please try again.');

@@ -4,12 +4,13 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { useCart } from '@/app/components/providers/CartProvider';
 import { formatLkr } from '@/lib/data';
-import { getOrderStatus, statusCopy } from '@/lib/orders';
+import OrderActions from '@/app/components/OrderActions';
+import { getOrderStatus, OrderStatus, statusCopy } from '@/lib/orders';
 
 const orderSteps = ['confirmed', 'preparing', 'on_the_way', 'delivered'] as const;
 
 export default function AdminPage() {
-  const { orders, updateOrderStatus } = useCart();
+  const { orders } = useCart();
   const [user, setUser] = useState<{ name?: string; role?: string } | null>(null);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<'all' | (typeof orderSteps)[number]>('all');
@@ -63,16 +64,21 @@ export default function AdminPage() {
     return matchesStatus && matchesRestaurant && matchesSearch;
   });
 
-  const revenue = filteredOrders.reduce((sum, order) => sum + order.total, 0);
-  const averageOrderValue = filteredOrders.length ? revenue / filteredOrders.length : 0;
+  const billableOrders = filteredOrders.filter((order) => getOrderStatus(order) !== 'cancelled');
+  const revenue = billableOrders.reduce((sum, order) => sum + order.total, 0);
+  const averageOrderValue = billableOrders.length ? revenue / billableOrders.length : 0;
   const deliveredCount = filteredOrders.filter((order) => getOrderStatus(order) === 'delivered').length;
-  const activeCount = filteredOrders.filter((order) => getOrderStatus(order) !== 'delivered').length;
+  const activeCount = filteredOrders.filter((order) => {
+    const status = getOrderStatus(order);
+    return status !== 'delivered' && status !== 'cancelled';
+  }).length;
 
-  const statusBreakdown: Record<(typeof orderSteps)[number], number> = {
+  const statusBreakdown: Record<OrderStatus, number> = {
     confirmed: 0,
     preparing: 0,
     on_the_way: 0,
     delivered: 0,
+    cancelled: 0,
   };
 
   filteredOrders.forEach((order) => {
@@ -216,7 +222,6 @@ export default function AdminPage() {
           ) : (
             filteredOrders.map((order) => {
               const currentStatus = getOrderStatus(order);
-              const currentIndex = orderSteps.indexOf(currentStatus);
 
               return (
                 <div key={order.id} className="rounded-xl border border-outline-variant/50 p-4">
@@ -231,22 +236,8 @@ export default function AdminPage() {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-3">
-                    {orderSteps.map((step, index) => (
-                      <button
-                        key={step}
-                        type="button"
-                        onClick={() => updateOrderStatus(order.id, step)}
-                        className={
-                          'rounded-lg px-2 py-2 text-xs font-label-bold transition-colors ' +
-                          (index <= currentIndex
-                            ? 'bg-secondary-container text-on-secondary-container'
-                            : 'bg-surface-variant/60 text-outline')
-                        }
-                      >
-                        {statusCopy[step].label}
-                      </button>
-                    ))}
+                  <div className="mb-3">
+                    <OrderActions order={order} actor="admin" />
                   </div>
 
                   <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2 text-sm text-on-surface-variant">

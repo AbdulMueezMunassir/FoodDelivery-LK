@@ -1,48 +1,12 @@
 import { NextResponse } from 'next/server';
 import { getSessionUser } from '@/lib/auth';
 import { prisma } from '@/lib/db';
+import { serializeOrder } from '@/lib/serialize-order';
 
-function serializeOrder(order: {
-  id: string;
-  userId: string | null;
-  restaurantId: number;
-  restaurantName: string;
-  subtotal: number;
-  deliveryFee: number;
-  total: number;
-  address: string;
-  phone: string;
-  customerName: string;
-  payment: string;
-  status: string;
-  items: string | unknown;
-  createdAt: Date;
-}) {
-  let parsedItems: unknown[] = [];
+export const dynamic = 'force-dynamic';
 
-  try {
-    parsedItems = typeof order.items === 'string' ? JSON.parse(order.items) : Array.isArray(order.items) ? order.items : [];
-  } catch {
-    parsedItems = [];
-  }
-
-  return {
-    id: order.id,
-    userId: order.userId,
-    restaurantId: order.restaurantId,
-    restaurantName: order.restaurantName,
-    subtotal: Number(order.subtotal),
-    deliveryFee: Number(order.deliveryFee),
-    total: Number(order.total),
-    address: order.address,
-    phone: order.phone,
-    customerName: order.customerName,
-    payment: order.payment,
-    status: String(order.status).toLowerCase(),
-    items: parsedItems,
-    createdAt: order.createdAt.toISOString(),
-  };
-}
+const MAX_LINES = 40;
+const MAX_QTY = 50;
 
 export async function GET() {
   const sessionUser = await getSessionUser();
@@ -74,28 +38,38 @@ export async function POST(request: Request) {
   const sessionUser = await getSessionUser();
 
   if (!sessionUser) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return NextResponse.json({ error: 'Please sign in to place an order.' }, { status: 401 });
   }
 
   try {
     const body = await request.json();
-    const {
-      items,
-      restaurantId,
-      address,
-      phone,
-      customerName,
-    } = body;
+    const items = body.items;
+    const restaurantId = Number(body.restaurantId);
+    const address = String(body.address ?? '').trim();
+    const phone = String(body.phone ?? '').trim();
+    const customerName = String(body.customerName ?? '').trim();
 
     if (!Array.isArray(items) || !items.length) {
       return NextResponse.json({ error: 'Cart is empty' }, { status: 400 });
     }
 
-    if (!Number.isInteger(Number(restaurantId)) || !address || !phone || !customerName) {
+    if (items.length > MAX_LINES) {
+      return NextResponse.json({ error: 'Too many items in one order.' }, { status: 400 });
+    }
+
+    if (!Number.isInteger(restaurantId) || !address || !phone || !customerName) {
       return NextResponse.json({ error: 'Missing order details' }, { status: 400 });
     }
 
-    const restaurant = await prisma.restaurant.findUnique({ where: { id: Number(restaurantId) } });
+    if (
+      address.length > 300 ||
+      customerName.length > 100 ||
+      !/^[0-9+()\-\s]{7,20}$/.test(phone)
+    ) {
+      return NextResponse.json({ error: 'Please check your name, phone number and address.' }, { status: 400 });
+    }
+
+    const restaurant = await prisma.restaurant.findUnique({ where: { id: restaurantId } });
     if (!restaurant) {
       return NextResponse.json({ error: 'Restaurant not found' }, { status: 404 });
     }
@@ -111,9 +85,11 @@ export async function POST(request: Request) {
     for (const item of items) {
       const qty = Number(item?.qty);
       const menuItem = menu.find((entry) => entry.id === item?.id);
-      if (!menuItem || !Number.isInteger(qty) || qty < 1) {
+
+      if (!menuItem || !Number.isInteger(qty) || qty < 1 || qty > MAX_QTY) {
         return NextResponse.json({ error: 'One or more cart items are no longer available.' }, { status: 400 });
       }
+
       pricedItems.push({
         id: menuItem.id,
         restaurantId: restaurant.id,

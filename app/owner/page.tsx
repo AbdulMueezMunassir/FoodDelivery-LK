@@ -2,14 +2,13 @@
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
+import OrderActions from '@/app/components/OrderActions';
 import { useCart } from '@/app/components/providers/CartProvider';
 import { formatLkr, Restaurant } from '@/lib/data';
-import { getOrderStatus, statusCopy } from '@/lib/orders';
-
-const orderSteps = ['confirmed', 'preparing', 'on_the_way', 'delivered'] as const;
+import { getOrderStatus } from '@/lib/orders';
 
 export default function OwnerDashboard() {
-  const { orders, updateOrderStatus } = useCart();
+  const { orders } = useCart();
   const [user, setUser] = useState<{ name?: string; role?: string } | null>(null);
   const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
   const [loading, setLoading] = useState(true);
@@ -51,8 +50,13 @@ export default function OwnerDashboard() {
   }
 
   const ownerOrders = orders.filter((order) => restaurants.some((restaurant) => restaurant.id === order.restaurantId));
-  const activeOrders = ownerOrders.filter((order) => getOrderStatus(order) !== 'delivered');
-  const revenue = ownerOrders.reduce((total, order) => total + order.total, 0);
+  const activeOrders = ownerOrders.filter((order) => {
+    const status = getOrderStatus(order);
+    return status !== 'delivered' && status !== 'cancelled';
+  });
+  const revenue = ownerOrders
+    .filter((order) => getOrderStatus(order) !== 'cancelled')
+    .reduce((total, order) => total + order.total, 0);
   const menuCount = restaurants.reduce((total, restaurant) => total + restaurant.menu.length, 0);
 
   return (
@@ -97,25 +101,15 @@ export default function OwnerDashboard() {
       <section className="glass-panel rounded-xl p-6">
         <h2 className="font-headline-md text-headline-md text-primary mb-5">Recent orders</h2>
         <div className="space-y-4">
-          {ownerOrders.length ? ownerOrders.slice(0, 12).map((order) => {
-            const status = getOrderStatus(order);
-            const currentIndex = orderSteps.indexOf(status);
-            return (
-              <article key={order.id} className="rounded-lg border border-outline-variant/60 p-4">
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-3">
-                  <div><p className="font-label-bold text-primary">{order.id}</p><p className="text-sm text-on-surface-variant">{order.customerName} · {order.restaurantName}</p></div>
-                  <p className="font-label-bold text-primary">{formatLkr(order.total)}</p>
-                </div>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                  {orderSteps.map((step, index) => (
-                    <button key={step} type="button" onClick={() => void updateOrderStatus(order.id, step)} className={'rounded-lg px-2 py-2 text-xs font-label-bold ' + (index <= currentIndex ? 'bg-secondary-container text-on-secondary-container' : 'bg-surface-variant/60 text-outline')}>
-                      {statusCopy[step].label}
-                    </button>
-                  ))}
-                </div>
-              </article>
-            );
-          }) : <p className="text-on-surface-variant">No orders for your restaurants yet.</p>}
+          {ownerOrders.length ? ownerOrders.slice(0, 12).map((order) => (
+            <article key={order.id} className="rounded-lg border border-outline-variant/60 p-4">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-3">
+                <div><p className="font-label-bold text-primary">{order.id}</p><p className="text-sm text-on-surface-variant">{order.customerName} · {order.restaurantName}</p></div>
+                <p className="font-label-bold text-primary">{formatLkr(order.total)}</p>
+              </div>
+              <OrderActions order={order} actor="owner" />
+            </article>
+          )) : <p className="text-on-surface-variant">No orders for your restaurants yet.</p>}
         </div>
       </section>
     </main>

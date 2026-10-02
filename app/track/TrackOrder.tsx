@@ -3,21 +3,23 @@
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
+import OrderActions from '@/app/components/OrderActions';
 import { useCart } from '@/app/components/providers/CartProvider';
+import { ORDER_FLOW } from '@/lib/order-status';
 import { getOrderStatus, statusCopy } from '@/lib/orders';
 import { formatLkr } from '@/lib/data';
-
-const steps = ['confirmed', 'preparing', 'on_the_way', 'delivered'] as const;
 
 export default function TrackOrder() {
   const searchParams = useSearchParams();
   const selectedId = searchParams.get('order');
   const { orders } = useCart();
-  const [, setTick] = useState(0);
+  const [userId, setUserId] = useState<string | null>(null);
 
   useEffect(() => {
-    const timer = setInterval(() => setTick((value) => value + 1), 15000);
-    return () => clearInterval(timer);
+    fetch('/api/auth/me')
+      .then((response) => (response.ok ? response.json() : null))
+      .then((user) => setUserId(user?.id ?? null))
+      .catch(() => setUserId(null));
   }, []);
 
   const selected = useMemo(
@@ -38,7 +40,8 @@ export default function TrackOrder() {
   }
 
   const status = getOrderStatus(selected);
-  const activeIndex = steps.indexOf(status);
+  const activeIndex = status === 'cancelled' ? -1 : ORDER_FLOW.indexOf(status);
+  const isMine = Boolean(userId) && selected.userId === userId;
 
   return (
     <div className="pt-24 pb-12 px-4 md:px-8 max-w-container-max mx-auto">
@@ -50,23 +53,33 @@ export default function TrackOrder() {
       <div className="glass-panel rounded-xl p-6 mb-8">
         <p className="font-headline-md text-headline-md text-primary">{statusCopy[status].label}</p>
         <p className="text-on-surface-variant mt-1 mb-6">{statusCopy[status].detail}</p>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          {steps.map((step, index) => (
-            <div
-              key={step}
-              className={
-                'rounded-lg px-3 py-3 text-sm font-label-bold ' +
-                (index <= activeIndex ? 'bg-secondary-container text-on-secondary-container' : 'bg-surface-variant/40 text-outline')
-              }
-            >
-              {statusCopy[step].label}
-            </div>
-          ))}
-        </div>
+
+        {status === 'cancelled' ? null : (
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            {ORDER_FLOW.map((step, index) => (
+              <div
+                key={step}
+                className={
+                  'rounded-lg px-3 py-3 text-sm font-label-bold ' +
+                  (index <= activeIndex ? 'bg-secondary-container text-on-secondary-container' : 'bg-surface-variant/40 text-outline')
+                }
+              >
+                {statusCopy[step].label}
+              </div>
+            ))}
+          </div>
+        )}
+
         <p className="text-sm text-on-surface-variant mt-6">
           Delivering to {selected.address} · {selected.phone}
         </p>
         <p className="font-label-bold text-primary mt-2">{formatLkr(selected.total)} · Cash on delivery</p>
+
+        {isMine ? (
+          <div className="mt-4">
+            <OrderActions order={selected} actor="customer" showProgress={false} />
+          </div>
+        ) : null}
       </div>
 
       {orders.length > 1 ? (

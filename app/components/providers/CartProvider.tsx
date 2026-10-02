@@ -5,6 +5,9 @@ import { usePathname } from 'next/navigation';
 import type { Restaurant } from '@/lib/data';
 import { CartItem, Order, cartCount, cartSubtotal, loadCart, saveCart } from '@/lib/orders';
 
+const LIVE_PATHS = ['/track', '/profile', '/owner', '/admin'];
+const POLL_MS = 10000;
+
 type CartContextValue = {
   items: CartItem[];
   orders: Order[];
@@ -18,14 +21,15 @@ type CartContextValue = {
   removeItem: (id: string) => void;
   clearCart: () => void;
   placeOrder: (details: { address: string; phone: string; customerName: string }) => Promise<Order | null>;
-  updateOrderStatus: (id: string, status: Order['status']) => Promise<void>;
+  /** Resolves to null on success, or the error message to show the user. */
+  updateOrderStatus: (id: string, status: Order['status']) => Promise<string | null>;
   refreshOrders: () => Promise<void>;
 };
 
 const CartContext = createContext<CartContextValue | null>(null);
 
 export function CartProvider({ children }: { children: React.ReactNode }) {
-  const pathname = usePathname();
+  const pathname = usePathname() ?? '';
   const [items, setItems] = useState<CartItem[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
   const [restaurantFee, setRestaurantFee] = useState(0);
@@ -40,7 +44,6 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  // Cart lives in the browser (guest cart), everything else comes from the server.
   useEffect(() => {
     setItems(loadCart());
     setReady(true);
@@ -53,6 +56,17 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   // Reload orders on every navigation, so login/logout never leaves stale orders behind.
   useEffect(() => {
     void refreshOrders();
+  }, [pathname, refreshOrders]);
+
+  // Live updates: poll while the person is on a page that shows order status.
+  useEffect(() => {
+    if (!LIVE_PATHS.some((path) => pathname.startsWith(path))) return;
+
+    const timer = setInterval(() => {
+      if (document.visibilityState === 'visible') void refreshOrders();
+    }, POLL_MS);
+
+    return () => clearInterval(timer);
   }, [pathname, refreshOrders]);
 
   const restaurantId = items[0]?.restaurantId;
@@ -126,7 +140,6 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              // Prices are never sent. The server prices the order from the menu.
               items: items.map((item) => ({ id: item.id, qty: item.qty })),
               restaurantId: items[0].restaurantId,
               address,
@@ -151,6 +164,8 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         }
       },
       updateOrderStatus: async (id, status) => {
+        let message = 'Could not update the order. Please try again.';
+
         try {
           const response = await fetch(`/api/orders/${id}`, {
             method: 'PATCH',
@@ -161,14 +176,17 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
           if (response.ok) {
             const data = (await response.json()) as { order: Order };
             setOrders((current) => current.map((order) => (order.id === id ? data.order : order)));
-            return;
+            return null;
           }
+
+          const errorData = (await response.json().catch(() => null)) as { error?: string } | null;
+          if (errorData?.error) message = errorData.error;
         } catch (error) {
           console.error('Order status update failed:', error);
         }
 
-        // The update failed: show what the server actually has, not a guess.
-        await refreshOrders();
+        await refreshOrders(); // show what the server actually has
+        return message;
       },
       refreshOrders,
     }),

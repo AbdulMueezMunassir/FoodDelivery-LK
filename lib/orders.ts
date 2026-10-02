@@ -1,3 +1,5 @@
+import { OrderStatus } from '@/lib/orders';
+
 export type CartItem = {
   id: string;
   restaurantId: number;
@@ -7,10 +9,9 @@ export type CartItem = {
   qty: number;
 };
 
-export type OrderStatus = 'confirmed' | 'preparing' | 'on_the_way' | 'delivered';
-
 export type Order = {
   id: string;
+  userId?: string | null;
   items: CartItem[];
   restaurantId: number;
   restaurantName: string;
@@ -49,16 +50,8 @@ export function cartSubtotal(items: CartItem[]) {
   return items.reduce((sum, item) => sum + item.price * item.qty, 0);
 }
 
-export function deriveStatus(createdAt: string): OrderStatus {
-  const elapsedMin = (Date.now() - new Date(createdAt).getTime()) / 60000;
-  if (elapsedMin < 2) return 'confirmed';
-  if (elapsedMin < 8) return 'preparing';
-  if (elapsedMin < 20) return 'on_the_way';
-  return 'delivered';
-}
-
-export function getOrderStatus(order: Pick<Order, 'status' | 'createdAt'>): OrderStatus {
-  return order.status ?? deriveStatus(order.createdAt);
+export function getOrderStatus(order: Pick<Order, 'status'>): OrderStatus {
+  return order.status;
 }
 
 export const statusCopy: Record<OrderStatus, { label: string; detail: string }> = {
@@ -66,4 +59,5 @@ export const statusCopy: Record<OrderStatus, { label: string; detail: string }> 
   preparing: { label: 'Preparing', detail: 'Your food is on the stove.' },
   on_the_way: { label: 'On the way', detail: 'A rider is heading to your address.' },
   delivered: { label: 'Delivered', detail: 'Enjoy your meal.' },
+  cancelled: { label: 'Cancelled', detail: 'This order was cancelled.' },
 };
